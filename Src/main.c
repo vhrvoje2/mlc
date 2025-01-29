@@ -21,7 +21,7 @@
 #include "cmsis_os.h"
 #include "fatfs.h"
 #include "usb_device.h"
-#include "ucf_file.h"
+#include "lsm6dsox_ucf.h"
 #include "usbd_cdc_if.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -937,47 +937,58 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+enum State
+{
+  Closed = 0,
+  Opened = 4,
+  Movement = 8,
+};
+
+#define FUNC_CFG_ACCESS_REG 0x01
+#define FUNC_CFG_ACCESS_VAL 0x80
+
+#define ACC_CONTROL_REG 0x10
+#define ACC_CFG_VAL 0x20
+#define GYRO_CONTROL_REG 0x11
+#define GYRO_CFG_VAL 0x24
+
+#define EMB_FUNC_EN_B_REG 0x05
+#define MLC_EN_BIT 0x10
+
+#define MLC_STATUS_INT_REG 0x15
+#define MLC0_SRC_REG 0x70
+
+#define WHO_AM_I_REG 0x0F
+#define LSM6DSOX_ID 0x6C
+#define MLC_MAINPAGE_REG 0x38
+#define MLC_STATUS_REG_1 0x70
+
+#define EMB_FUNC_INIT_B 0x67
+char buf[64];
+
+void usb_debug_print(const char *msg)
+{
+  CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
+}
 
 /**
  * @brief Sends a single register-value pair to the LSM6DSOX via SPI.
  * @param reg Register address (8-bit).
  * @param value Value to write (8-bit).
  */
-void lsm6dsox_spi_write(uint8_t reg, uint8_t value)
+HAL_StatusTypeDef lsm6dsox_spi_write(uint8_t reg, uint8_t data)
 {
-  // The first byte is the register address (with MSB cleared for write).
-  uint8_t tx_data[2] = {reg & 0x7F, value};
+  uint8_t tx_buffer[2];
+  tx_buffer[0] = reg & 0x7F;
+  tx_buffer[1] = data;
 
-  // Pull CS low to select the sensor
   HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_RESET);
 
-  // Send data over SPI
-  HAL_SPI_Transmit(&hspi1, tx_data, 2, HAL_MAX_DELAY);
+  HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi1, tx_buffer, 2, HAL_MAX_DELAY);
 
-  // Pull CS high to deselect the sensor
   HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_SET);
 
-  // Small delay for stability
-  HAL_Delay(10);
-}
-
-/**
- * @brief Sends the entire UCF configuration file to the LSM6DSOX.
- */
-void lsm6dsox_load_ucf_via_spi()
-{
-  size_t ucf_size = sizeof(lsm6dsox_ucf) / sizeof(lsm6dsox_ucf[0]);
-
-  for (size_t i = 0; i < ucf_size; i += 2)
-  {
-    uint8_t reg = lsm6dsox_ucf[i];       // Register address
-    uint8_t value = lsm6dsox_ucf[i + 1]; // Register value
-
-    lsm6dsox_spi_write(reg, value);
-  }
-
-  // Configuration is complete
-  HAL_Delay(10); // Delay for sensor to stabilize after loading UCF
+  return status;
 }
 
 /**
@@ -985,34 +996,79 @@ void lsm6dsox_load_ucf_via_spi()
  * @param reg Register address to read.
  * @return The value read from the register.
  */
-uint8_t lsm6dsox_spi_read(uint8_t reg)
+HAL_StatusTypeDef lsm6dsox_spi_read(uint8_t reg, uint8_t *data)
 {
-  uint8_t tx_data = reg | 0x80;
-  uint8_t rx_data = 0;
+  uint8_t tx_buffer[2];
+  uint8_t rx_buffer[2];
 
-  // Pull CS low to select the sensor
+  tx_buffer[0] = reg | 0x80;
+  tx_buffer[1] = 0x00;
+
   HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_RESET);
 
-  // Transmit the register address and receive the response
-  HAL_SPI_Transmit(&hspi1, &tx_data, 1, HAL_MAX_DELAY);
-  HAL_SPI_Receive(&hspi1, &rx_data, 1, HAL_MAX_DELAY);
+  HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&hspi1, tx_buffer, rx_buffer, 2, HAL_MAX_DELAY);
 
-  // Pull CS high to deselect the sensor
   HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_SET);
 
-  return rx_data;
+  *data = rx_buffer[1];
+
+  return status;
+}
+
+void lsm6dsox_who_am_i()
+{
+  uint8_t who_am_i;
+  if (lsm6dsox_spi_read(WHO_AM_I_REG, &who_am_i) == HAL_OK)
+  {
+    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
+  }
+  else
+  {
+    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
+  }
+}
+
+void lsm6dsox_configure()
+{
+  HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_SET);
+
+  if (lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_VAL) != HAL_OK)
+  {
+    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+  };
+
+  if (lsm6dsox_spi_write(ACC_CONTROL_REG, ACC_CFG_VAL) != HAL_OK)
+  {
+    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+  };
+
+  if (lsm6dsox_spi_write(GYRO_CONTROL_REG, GYRO_CFG_VAL) != HAL_OK)
+  {
+    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+  };
+}
+
+/**
+ * @brief Sends the entire UCF configuration file to the LSM6DSOX.
+ */
+void lsm6dsox_load_ucf()
+{
+  size_t ucf_size = sizeof(movement) / sizeof(movement[0]);
+  size_t i;
+  for (i = 0; i < ucf_size; i += 2)
+  {
+    uint8_t reg = movement->address;
+    uint8_t value = movement->data;
+
+    if (lsm6dsox_spi_write(reg, value) != HAL_OK)
+    {
+      HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+    };
+  }
+
+  HAL_Delay(10);
 }
 /* USER CODE END 4 */
-
-void usb_debug_print(const char *msg)
-{
-  CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
-}
-
-uint8_t lsm6dsox_read_mlc_status(void)
-{
-  return lsm6dsox_spi_read(0x1B); // MLC_STATUS_MAINPAGE
-}
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
@@ -1023,43 +1079,44 @@ uint8_t lsm6dsox_read_mlc_status(void)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
-  // JEBATIBOGMATER
-  /* init code for USB_DEVICE */
-  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
+  MX_USB_DEVICE_Init();
+
+  lsm6dsox_who_am_i();
+  lsm6dsox_configure();
+  lsm6dsox_load_ucf();
+
+  enum State lastState = Closed;
+
   /* Infinite loop */
-
-  // upload ufc file to MLC
-  // enable MLC functionality EMB_FUNC_EN_B
-  uint8_t who_am_i = lsm6dsox_spi_read(0x0F);
-  if (who_am_i == 0x6C)
-  {
-    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
-    lsm6dsox_load_ucf_via_spi();
-  }
-  else
-  {
-    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
-  }
-
-  char buf[64];
-
-  usb_debug_print("Debug works");
-
   for (;;)
   {
-    uint8_t mlc_status = lsm6dsox_read_mlc_status();
-    if (mlc_status > 0)
+    uint8_t output;
+    if (lsm6dsox_spi_read(MLC0_SRC_REG, &output) == HAL_OK)
     {
-      usb_debug_print("MLC Status works\r\n");
-      sprintf(buf, "MLC Status %d\r\n", mlc_status);
-      usb_debug_print(buf);
+      if (output != lastState)
+      {
+        switch (output)
+        {
+        case 0:
+          sprintf(buf, "STATE CHANGE: CLOSED\r\n");
+          break;
+        case 4:
+          sprintf(buf, "STATE CHANGE: OPENED\r\n");
+          break;
+        case 8:
+          sprintf(buf, "STATE CHANGE: MOVEMENT\r\n");
+          break;
+        default:
+          break;
+        }
+        usb_debug_print(buf);
+        lastState = output;
+      }
     }
-    HAL_Delay(10);
-  }
 
-  HAL_GPIO_TogglePin(CPU_LED_GPIO_Port, CPU_LED_Pin);
-  osDelay(1000);
+    osDelay(10);
+  }
 }
 /* USER CODE END 5 */
 

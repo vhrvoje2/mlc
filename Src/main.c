@@ -964,7 +964,9 @@ enum State
 #define MLC_STATUS_REG_1 0x70
 
 #define EMB_FUNC_INIT_B 0x67
-char buf[64];
+
+#define PAGE_SEL_REG 0x02
+#define PAGE_SEL_VAL 0x00
 
 void usb_debug_print(const char *msg)
 {
@@ -1015,36 +1017,23 @@ HAL_StatusTypeDef lsm6dsox_spi_read(uint8_t reg, uint8_t *data)
   return status;
 }
 
-void lsm6dsox_who_am_i()
-{
-  uint8_t who_am_i;
-  if (lsm6dsox_spi_read(WHO_AM_I_REG, &who_am_i) == HAL_OK)
-  {
-    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
-  }
-  else
-  {
-    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
-  }
-}
-
 void lsm6dsox_configure()
 {
-  HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
 
   if (lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_VAL) != HAL_OK)
   {
-    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
   };
 
   if (lsm6dsox_spi_write(ACC_CONTROL_REG, ACC_CFG_VAL) != HAL_OK)
   {
-    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
   };
 
   if (lsm6dsox_spi_write(GYRO_CONTROL_REG, GYRO_CFG_VAL) != HAL_OK)
   {
-    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
   };
 }
 
@@ -1062,11 +1051,10 @@ void lsm6dsox_load_ucf()
 
     if (lsm6dsox_spi_write(reg, value) != HAL_OK)
     {
-      HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
     };
   }
-
-  HAL_Delay(10);
+  osDelay(50);
 }
 /* USER CODE END 4 */
 
@@ -1081,16 +1069,39 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   MX_USB_DEVICE_Init();
-
-  lsm6dsox_who_am_i();
-  lsm6dsox_configure();
+  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
+  /* lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_VAL);
+  osDelay(300); */
+  /* lsm6dsox_spi_write(PAGE_SEL_REG, PAGE_SEL_VAL);
+  osDelay(300); */
+  /* lsm6dsox_spi_write(ACC_CONTROL_REG, ACC_CFG_VAL);
+  osDelay(300); */
+  /* lsm6dsox_spi_write(GYRO_CONTROL_REG, GYRO_CFG_VAL);
+  osDelay(300); */
+  osDelay(5000);
   lsm6dsox_load_ucf();
+  osDelay(5000);
+  /* lsm6dsox_spi_write(EMB_FUNC_EN_B_REG, MLC_EN_BIT);
+  osDelay(300); */
+  /* lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, 0x00);
+  osDelay(300); */
 
   enum State lastState = Closed;
-
+  uint8_t cnt = 0;
   /* Infinite loop */
   for (;;)
   {
+    char buf[100];
+    uint8_t ID, mlc_en, acc_config, gyro_config, out;
+
+    lsm6dsox_spi_read(WHO_AM_I_REG, &ID);
+    lsm6dsox_spi_read(EMB_FUNC_EN_B_REG, &mlc_en);
+    lsm6dsox_spi_read(ACC_CONTROL_REG, &acc_config);
+    lsm6dsox_spi_read(GYRO_CONTROL_REG, &gyro_config);
+    lsm6dsox_spi_read(MLC0_SRC_REG, &out);
+    sprintf(buf, "%d. ID: 0x%02X, MLC: 0x%02X, Acc Config: 0x%02X, Gyro Config: 0x%02X, Out: 0x%02X\r\n", cnt++, ID, mlc_en, acc_config, gyro_config, out);
+    usb_debug_print(buf);
+
     uint8_t output;
     if (lsm6dsox_spi_read(MLC0_SRC_REG, &output) == HAL_OK)
     {
@@ -1099,23 +1110,24 @@ void StartDefaultTask(void *argument)
         switch (output)
         {
         case 0:
-          sprintf(buf, "STATE CHANGE: CLOSED\r\n");
+          usb_debug_print("STATE CHANGE: CLOSED\r\n");
           break;
         case 4:
-          sprintf(buf, "STATE CHANGE: OPENED\r\n");
+          usb_debug_print("STATE CHANGE: OPENED\r\n");
           break;
         case 8:
-          sprintf(buf, "STATE CHANGE: MOVEMENT\r\n");
+          usb_debug_print("STATE CHANGE: MOVEMENT\r\n");
           break;
         default:
+          sprintf(buf, "UNKNOWN STATE: %d\r\n", output);
+          usb_debug_print(buf);
           break;
         }
-        usb_debug_print(buf);
         lastState = output;
       }
     }
 
-    osDelay(10);
+    osDelay(100);
   }
 }
 /* USER CODE END 5 */

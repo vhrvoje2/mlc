@@ -1,6 +1,6 @@
 /*
  ******************************************************************************
- * @file    lsm6dsox_ucf.h
+ * @file    movement.h
  * @author  Sensors Software Solution Team
  * @brief   This file contains the configuration for movement.
  *
@@ -18,8 +18,8 @@
  */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef LSM6DSOX_INCLUDED_H
-#define LSM6DSOX_INCLUDED_H
+#ifndef movement_H
+#define movement_H
 
 #ifdef __cplusplus
 extern "C"
@@ -791,4 +791,4 @@ extern "C"
 }
 #endif
 
-#endif /* LSM6DSOX_INCLUDED_H */
+#endif

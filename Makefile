@@ -108,7 +108,9 @@ Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c \
 Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c \
 Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c \
 Src/sysmem.c \
-Src/syscalls.c  
+Src/syscalls.c \
+Drivers/SPI/spi.c \
+Drivers/LSM6DSOX/lsm6dsox.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -179,7 +181,9 @@ C_INCLUDES =  \
 -IMiddlewares/ST/STM32_USB_Device_Library/Core/Inc \
 -IMiddlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc \
 -IDrivers/CMSIS/Device/ST/STM32L4xx/Include \
--IDrivers/CMSIS/Include
+-IDrivers/CMSIS/Include \
+-IDrivers/SPI \
+-IDrivers/LSM6DSOX
 
 
 # compile gcc flags

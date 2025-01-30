@@ -41,7 +41,7 @@ extern "C"
 #endif /* MEMS_UCF_SHARED_TYPES */
 
     /** Configuration array generated from Unico Tool **/
-    const ucf_line_t movement[] = {
+    const static ucf_line_t movement[] = {
         {
             .address = 0x10,
             .data = 0x00,

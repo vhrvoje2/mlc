@@ -21,8 +21,9 @@
 #include "cmsis_os.h"
 #include "fatfs.h"
 #include "usb_device.h"
-#include "lsm6dsox_ucf.h"
 #include "usbd_cdc_if.h"
+#include "spi.h"
+#include "lsm6dsox.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -937,136 +938,11 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-enum State
-{
-  Closed = 0,
-  Opened = 4,
-  Movement = 8,
-};
-
-#define FUNC_CFG_ACCESS_REG 0x01
-#define FUNC_CFG_ACCESS_VAL 0x80
-
-#define ACC_CONTROL_REG 0x10
-#define ACC_CFG_VAL 0x20
-#define GYRO_CONTROL_REG 0x11
-#define GYRO_CFG_VAL 0x24
-
-#define EMB_FUNC_EN_B_REG 0x05
-#define MLC_EN_BIT 0x10
-
-#define MLC_STATUS_INT_REG 0x15
-#define MLC0_SRC_REG 0x70
-
-#define WHO_AM_I_REG 0x0F
-#define LSM6DSOX_ID 0x6C
-#define MLC_MAINPAGE_REG 0x38
-#define MLC_STATUS_REG_1 0x70
-
-#define EMB_FUNC_INIT_B 0x67
-char buf[64];
-
+// Debug buffer and function
+char buffer[64];
 void usb_debug_print(const char *msg)
 {
   CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
-}
-
-/**
- * @brief Sends a single register-value pair to the LSM6DSOX via SPI.
- * @param reg Register address (8-bit).
- * @param value Value to write (8-bit).
- */
-HAL_StatusTypeDef lsm6dsox_spi_write(uint8_t reg, uint8_t data)
-{
-  uint8_t tx_buffer[2];
-  tx_buffer[0] = reg & 0x7F;
-  tx_buffer[1] = data;
-
-  HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_RESET);
-
-  HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi1, tx_buffer, 2, HAL_MAX_DELAY);
-
-  HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_SET);
-
-  return status;
-}
-
-/**
- * @brief Reads a single register value from the LSM6DSOX via SPI.
- * @param reg Register address to read.
- * @return The value read from the register.
- */
-HAL_StatusTypeDef lsm6dsox_spi_read(uint8_t reg, uint8_t *data)
-{
-  uint8_t tx_buffer[2];
-  uint8_t rx_buffer[2];
-
-  tx_buffer[0] = reg | 0x80;
-  tx_buffer[1] = 0x00;
-
-  HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_RESET);
-
-  HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&hspi1, tx_buffer, rx_buffer, 2, HAL_MAX_DELAY);
-
-  HAL_GPIO_WritePin(CS_LSM6DSOX_GPIO_Port, CS_LSM6DSOX_Pin, GPIO_PIN_SET);
-
-  *data = rx_buffer[1];
-
-  return status;
-}
-
-void lsm6dsox_who_am_i()
-{
-  uint8_t who_am_i;
-  if (lsm6dsox_spi_read(WHO_AM_I_REG, &who_am_i) == HAL_OK)
-  {
-    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
-  }
-  else
-  {
-    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
-  }
-}
-
-void lsm6dsox_configure()
-{
-  HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_SET);
-
-  if (lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_VAL) != HAL_OK)
-  {
-    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
-  };
-
-  if (lsm6dsox_spi_write(ACC_CONTROL_REG, ACC_CFG_VAL) != HAL_OK)
-  {
-    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
-  };
-
-  if (lsm6dsox_spi_write(GYRO_CONTROL_REG, GYRO_CFG_VAL) != HAL_OK)
-  {
-    HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
-  };
-}
-
-/**
- * @brief Sends the entire UCF configuration file to the LSM6DSOX.
- */
-void lsm6dsox_load_ucf()
-{
-  size_t ucf_size = sizeof(movement) / sizeof(movement[0]);
-  size_t i;
-  for (i = 0; i < ucf_size; i += 2)
-  {
-    uint8_t reg = movement->address;
-    uint8_t value = movement->data;
-
-    if (lsm6dsox_spi_write(reg, value) != HAL_OK)
-    {
-      HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
-    };
-  }
-
-  HAL_Delay(10);
 }
 /* USER CODE END 4 */
 
@@ -1082,7 +958,6 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
   MX_USB_DEVICE_Init();
 
-  lsm6dsox_who_am_i();
   lsm6dsox_configure();
   lsm6dsox_load_ucf();
 
@@ -1099,18 +974,18 @@ void StartDefaultTask(void *argument)
         switch (output)
         {
         case 0:
-          sprintf(buf, "STATE CHANGE: CLOSED\r\n");
+          sprintf(buffer, "STATE CHANGE: CLOSED - %d\r\n", output);
           break;
         case 4:
-          sprintf(buf, "STATE CHANGE: OPENED\r\n");
+          sprintf(buffer, "STATE CHANGE: OPENED - %d\r\n", output);
           break;
         case 8:
-          sprintf(buf, "STATE CHANGE: MOVEMENT\r\n");
+          sprintf(buffer, "STATE CHANGE: MOVEMENT - %d\r\n", output);
           break;
         default:
           break;
         }
-        usb_debug_print(buf);
+        usb_debug_print(buffer);
         lastState = output;
       }
     }

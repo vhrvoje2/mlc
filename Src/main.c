@@ -21,8 +21,7 @@
 #include "cmsis_os.h"
 #include "fatfs.h"
 #include "usb_device.h"
-// #include "lsm6dsox_ucf.h"
-#include "ucf_file.h"
+#include "lsm6dsox_ucf.h"
 #include "usbd_cdc_if.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -1059,20 +1058,20 @@ void lsm6dsox_configure()
  */
 void lsm6dsox_load_ucf()
 {
-  /*   size_t ucf_size = sizeof(movement) / sizeof(ucf_line_t);
-    size_t i;
-    for (i = 0; i < ucf_size; i++)
+  size_t ucf_size = sizeof(movement) / sizeof(ucf_line_t);
+  size_t i;
+  for (i = 0; i < ucf_size; i++)
+  {
+    uint8_t reg = movement[i].address;
+    uint8_t value = movement[i].data;
+
+    if (lsm6dsox_spi_write(reg, value) != HAL_OK)
     {
-      uint8_t reg = movement->address;
-      uint8_t value = movement->data;
+      HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+    };
+  }
 
-      if (lsm6dsox_spi_write(reg, value) != HAL_OK)
-      {
-        HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
-      };
-    } */
-
-  size_t ucf_size = sizeof(lsm6dsox_ucf) / sizeof(lsm6dsox_ucf[0]);
+  /* size_t ucf_size = sizeof(lsm6dsox_ucf) / sizeof(lsm6dsox_ucf[0]);
   size_t i;
   for (i = 0; i < ucf_size; i += 2)
   {
@@ -1083,7 +1082,7 @@ void lsm6dsox_load_ucf()
     {
       HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
     };
-  }
+  } */
 
   sprintf(buf, "UCF size %d, i=%d\r\n", ucf_size, i);
   usb_debug_print(buf);
@@ -1102,7 +1101,7 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   MX_USB_DEVICE_Init();
-  osDelay(8000);
+  osDelay(1000);
   usb_debug_print("READY\r\n");
 
   lsm6dsox_who_am_i();
@@ -1115,52 +1114,39 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for (;;)
   {
-    uint8_t output;
-    if (lsm6dsox_spi_read(0x38, &output) == HAL_OK)
+    if (lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_VAL) != HAL_OK)
     {
-      if (lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_VAL) != HAL_OK)
-      {
-        HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
-      };
-      uint8_t mlc0, mlc1, mlc2, mlc3, mlc4, mlc5, mlc6, mlc7;
-      lsm6dsox_spi_read(0x70, &mlc0);
-      lsm6dsox_spi_read(0x71, &mlc1);
-      lsm6dsox_spi_read(0x72, &mlc2);
-      lsm6dsox_spi_read(0x73, &mlc3);
-      lsm6dsox_spi_read(0x74, &mlc4);
-      lsm6dsox_spi_read(0x75, &mlc5);
-      lsm6dsox_spi_read(0x76, &mlc6);
-      lsm6dsox_spi_read(0x77, &mlc7);
-      if (lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, 0x00) != HAL_OK)
-      {
-        HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
-      };
-      if (output != lastState)
-      {
-        sprintf(buf, "MLC0: %d, MLC1: %d, MLC2: %d, MLC3: %d, MLC4: %d, MLC5: %d, MLC6: %d, MLC7: %d\r\n", mlc0, mlc1, mlc2, mlc3, mlc4, mlc5, mlc6, mlc7);
-        usb_debug_print(buf);
-        switch (output)
-        {
-        case 0:
-          sprintf(buf, "STATE CHANGE: CLOSED\r\n");
-          break;
-        case 4:
-          sprintf(buf, "STATE CHANGE: OPENED\r\n");
-          break;
-        case 8:
-          sprintf(buf, "STATE CHANGE: MOVEMENT\r\n");
-          break;
-        default:
-          sprintf(buf, "UNKNOWN STATE CHANGE\r\n");
-          break;
-        }
-        lastState = output;
-        usb_debug_print(buf);
-      }
-    }
+      HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+    };
+    uint8_t output;
+    lsm6dsox_spi_read(MLC0_SRC_REG, &output);
+    if (lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, 0x00) != HAL_OK)
+    {
+      HAL_GPIO_WritePin(CPU_LED_GPIO_Port, CPU_LED_Pin, GPIO_PIN_RESET);
+    };
 
-    osDelay(10);
+    if (output != lastState)
+    {
+      switch (output)
+      {
+      case 0:
+        sprintf(buf, "STATE CHANGE: CLOSED\r\n");
+        break;
+      case 4:
+        sprintf(buf, "STATE CHANGE: MOVEMENT\r\n");
+        break;
+      case 8:
+        sprintf(buf, "STATE CHANGE: OPENED\r\n");
+        break;
+      default:
+        sprintf(buf, "UNKNOWN STATE CHANGE\r\n");
+        break;
+      }
+      lastState = output;
+      usb_debug_print(buf);
+    }
   }
+  osDelay(10);
 }
 /* USER CODE END 5 */
 

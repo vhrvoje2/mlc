@@ -16,12 +16,6 @@
 TARGET = mlc
 
 ######################################
-# cpp
-######################################
-CXX = arm-none-eabi-g++
-CXXFLAGS = -mcpu=cortex-m4 -mthumb -std=c++17 -O2 -Wall -fno-rtti -fno-exceptions
-
-######################################
 # building variables
 ######################################
 # debug build?
@@ -87,6 +81,7 @@ Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_mmc.c \
 Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_mmc_ex.c \
 Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_spi.c \
 Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_spi_ex.c \
+Drivers/LSM6DSOX/lsm6dsox_spi.c \
 Src/system_stm32l4xx.c \
 Middlewares/Third_Party/FatFs/src/diskio.c \
 Middlewares/Third_Party/FatFs/src/ff.c \
@@ -108,7 +103,7 @@ Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c \
 Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c \
 Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c \
 Src/sysmem.c \
-Src/syscalls.c  
+Src/syscalls.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -179,7 +174,8 @@ C_INCLUDES =  \
 -IMiddlewares/ST/STM32_USB_Device_Library/Core/Inc \
 -IMiddlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc \
 -IDrivers/CMSIS/Device/ST/STM32L4xx/Include \
--IDrivers/CMSIS/Include
+-IDrivers/CMSIS/Include \
+-IDrivers/LSM6DSOX
 
 
 # compile gcc flags

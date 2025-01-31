@@ -1,0 +1,10 @@
+Mean AX AZ GY
+Energy GY
+Peak to Peak AX AZ GY
+Minimum AX AZ GY
+Maximum AX AZ GY
+
+movement states:
+	0x00 - closed
+	0x04 - movement
+	0x08 - opened

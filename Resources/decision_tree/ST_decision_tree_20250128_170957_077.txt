@@ -1,0 +1,38 @@
+F1_MEAN_on_ACC_X <= -0.022934: closed (4.0)
+F1_MEAN_on_ACC_X > -0.022934
+|   F1_MEAN_on_ACC_X <= 0.583496: movement (3.0)
+|   F1_MEAN_on_ACC_X > 0.583496: opened (3.0)
+
+Number of Leaves  : 	3
+Size of the tree : 	5
+
+
+class:
+ => opened, movement, closed, 
+features:
+ => F1_MEAN_on_ACC_X, F2_MEAN_on_ACC_Z, F3_MEAN_on_GY_Y, F4_ENERGY_on_GY_Y, F5_PeakToPeak_on_ACC_X, F6_PeakToPeak_on_ACC_Z, F7_PeakToPeak_on_GY_Y, F8_MIN_on_ACC_X, F9_MIN_on_ACC_Y, F10_MIN_on_GY_Y, F11_MAX_on_ACC_X, F12_MAX_on_ACC_Z, F13_MAX_on_GY_Y, 
+
+
+Mean absolute error	0.783333
+Root mean squared error	0.800521
+ ======= Whole data training with Confidence Factor: 0.9 ========= 
+
+
+===== Confusion Matrix =====
+         	opened   	movement 	closed   	<-- classified as
+opened   	3	0	0	
+movement 	0	3	0	
+closed   	0	0	4	
+
+Total Number of Instances        : 10
+Correctly Classified Instances   : 10
+Incorrectly Classified Instances : 0
+Kappa Statistic: 0.34
+Accuracy: 100%
+
+Report  :	precision	recall	support	
+opened   	1    	1	 3
+movement 	1    	1	 3
+closed   	1    	1	 4
+
+avg/total	1    	1	 10

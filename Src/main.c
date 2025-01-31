@@ -506,16 +506,16 @@ void StartDefaultTask(void *argument)
       switch (mlc_output)
       {
       case 0:
-        usb_print("STATE CHANGE: CLOSED\r\n");
+        usb_print("STATE CHANGE: CLOSED");
         break;
       case 4:
-        usb_print("STATE CHANGE: MOVEMENT\r\n");
+        usb_print("STATE CHANGE: MOVEMENT");
         break;
       case 8:
-        usb_print("STATE CHANGE: OPENED\r\n");
+        usb_print("STATE CHANGE: OPENED");
         break;
       default:
-        usb_print("STATE CHANGE: UNKNOWN\r\n");
+        usb_print("STATE CHANGE: UNKNOWN");
         break;
       }
       lastState = mlc_output;

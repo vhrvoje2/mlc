@@ -6,6 +6,7 @@ HAL_StatusTypeDef lsm6dsox_spi_read(uint8_t reg, uint8_t *data)
     uint8_t tx_buffer[2];
     uint8_t rx_buffer[2];
 
+    // Set MSB pin to 1 for read
     tx_buffer[0] = reg | 0x80;
     tx_buffer[1] = 0x00;
 
@@ -23,6 +24,8 @@ HAL_StatusTypeDef lsm6dsox_spi_read(uint8_t reg, uint8_t *data)
 HAL_StatusTypeDef lsm6dsox_spi_write(uint8_t reg, uint8_t data)
 {
     uint8_t tx_buffer[2];
+
+    // Set MSB pin to 0 for write
     tx_buffer[0] = reg & 0x7F;
     tx_buffer[1] = data;
 
@@ -35,9 +38,6 @@ HAL_StatusTypeDef lsm6dsox_spi_write(uint8_t reg, uint8_t data)
     return status;
 }
 
-/**
- * @brief Sends the entire UCF configuration file to the LSM6DSOX.
- */
 void lsm6dsox_load_ucf()
 {
     size_t ucf_size = sizeof(movement) / sizeof(ucf_line_t);

@@ -42,8 +42,12 @@ def update_ui(state):
         opened_box.config(bg="green")
     elif state == "MOVEMENT":
         movement_box.config(bg="green")
-    else:
+    elif state == "CLOSED":
         closed_box.config(bg="green")
+    else:
+        opened_box.config(bg="yellow")
+        movement_box.config(bg="yellow")
+        closed_box.config(bg="yellow")
 
 
 root = tk.Tk()

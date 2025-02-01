@@ -469,7 +469,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(USER_PB1_GPIO_Port, &GPIO_InitStruct);
 }
 
-// USB print function
+/**
+ * @brief  Sends the content of supplied buffer to USB output
+ * @param  msg: Pointer to buffer to be sent
+ */
 void usb_print(const char *msg)
 {
   CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
@@ -492,13 +495,16 @@ void StartDefaultTask(void *argument)
   lsm6dsox_load_ucf();
 
   enum State lastState = Closed;
-  uint8_t mlc_output = 0;
+  enum State mlc_output = Closed;
 
   /* Infinite loop */
   for (;;)
   {
+    // Enable embedded functions to read MLC register
     lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_SET);
+    // Read output for decision tree 0
     lsm6dsox_spi_read(MLC0_SRC_REG, &mlc_output);
+    // Disable embedded functions after read
     lsm6dsox_spi_write(FUNC_CFG_ACCESS_REG, FUNC_CFG_ACCESS_RESET);
 
     if (mlc_output != lastState)
